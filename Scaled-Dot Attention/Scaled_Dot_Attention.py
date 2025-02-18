@@ -1,5 +1,5 @@
 # 来自《Attention is All You Need》的Scaled Dot-Product Attention
-
+# 教程：https://zhuanlan.zhihu.com/p/665148654
 # 序列编码的基本思路有多种：
 # 第一种是RNN，递归式进行，结构比较简单但是无法并行计算，速度较慢
 # 第二种是CNN，使用窗口进行遍历，虽然很方便并行但难以捕获长距离依赖，且并行化程度不够，此外CNN对位置信息不敏感，因为卷及操作具有平移不变性，添加位置信息不如Transformer方便
@@ -18,6 +18,7 @@ n_layers = 6  # encoder layers, decoder layers 的个数
 n_heads = 8  # 注意力的头数
 
 
+# 正弦位置编码
 class PositionalEncoding(nn.Module):
     def __init__(self, d_model=512, dropout=0.1, max_length=5000):
         """
@@ -47,30 +48,30 @@ class PositionalEncoding(nn.Module):
         Return:
             dropout(x):[batch_size, seq_len, d_model]
         """
-        x = x+self.PE[:,:x.size(1),:] # 此处可以使用self.PE是因为register_buffer()可以将储存的变量变成元素
+        x = x + self.PE[:, :x.size(1), :]  # 此处可以使用self.PE是因为register_buffer()可以将储存的变量变成元素
         return self.dropout(x)
 
 
-
-
-class EncoderDecoder(nn.Module):
+# 补齐部分掩码 Padding Mask
+# 因为输入的序列长短不一，所以需要用占位符<PAD>都补足成为最长句子的长度，而这些补齐位置不需要参加注意力的计算，所以添加掩码
+# 当mask=True时遮掩，在计算出注意力分数矩阵后对该矩阵作用，注意力分数矩阵的(i,j)表示第i个词的q与第j个词的k的注意力分数，而占位符不应该被查询，此时j列应该被mask
+# 为什么只遮掩k不遮掩q？
+def get_attn_pad_mask(seq_q: torch.Tensor, seq_k: torch.Tensor) -> torch.Tensor:
     """
-    Encoder-Decoder结构
+    为encoder_input和decoder_input做一个mask，把占位符mask掉
+    Args:
+        seq_q:
+        seq_k:
+
+    Returns:
+        bool:[batch_size, len_q, len_k]
     """
+    batch_size, len_q = seq_q.size()
+    batch_size, len_k = seq_k.size()
+    attn_pad_mask = seq_k.data.eq(0).unsqueeze(1)  # [batch_size, 1, len_k] 1用于广播
+    return attn_pad_mask.expand(batch_size, len_q, len_k)  # [batch_size, len_q, len_k]
 
-    def __init__(self, encoder, decoder, src_embed, tgt_embed, generator):
-        super(EncoderDecoder, self).__init__()
-        self.encoder = encoder
-        self.decoder = decoder
-        self.src_embed = src_embed
-        self.tgt_embed = tgt_embed
-        self.generator = generator
 
-    def forward(self, src, tgt, src_mask, tgt_mask):
-        return self.decode(self.encode(src, src_mask), src_mask, tgt, tgt_mask)
 
-    def encoder(self, src, src_mask):
-        return self.encoder(self.src_embed(src), src_mask)
 
-    def decoder(self, ):pass
 
